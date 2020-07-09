@@ -1,0 +1,43 @@
+service:
+  name: childAssets
+
+custom:
+  webpack:
+    webpackConfig: ./webpack.config.js
+    includeModules:
+      forceExclude:
+        - aws-sdk
+  serverless-iam-roles-per-function:
+    defaultInherit: true
+  prune:
+    automatic: true
+    number: 3
+  profiles:
+    dev: default
+  regions:
+    dev: eu-central-1
+
+plugins:
+  - serverless-webpack
+  - serverless-iam-roles-per-function
+  - serverless-prune-plugin
+  - serverless-offline
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  stage: ${opt:stage, 'dev'}
+  profile: ${self:custom.profiles.${self:provider.stage}}
+  region: ${opt:region, self:custom.regions.${self:provider.stage}}
+  memorySize: 128
+  timeout: 30
+  environment:
+    NODE_ENV: ${self:provider.stage}
+
+functions:
+  handler:
+    handler: src/handler.index
+    events:
+      - http:
+          path: getChilds
+          method: post
