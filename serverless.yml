@@ -41,3 +41,9 @@ functions:
       - http:
           path: getChilds
           method: post
+  folderStructure:
+    handler: src/folderStructure.index
+    events:
+      - http:
+          path: getFolderStructure
+          method: post
