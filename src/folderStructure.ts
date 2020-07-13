@@ -11,7 +11,15 @@ function fetchNextPages(elements: ElementResponse, url: string) {
     pages.map((pageIndex) =>
       fetch(`${url}${pageIndex}`)
         .then((resp) => resp.json())
-        .then((data) => data.Response.elements as Element)
+        .then((data) => {
+          // if (data.Response.elements === undefined) {
+          //   console.log("under");
+          // }
+          if (data.Response.elements !== undefined) {
+            return data.Response.elements as Element;
+          }
+          return null;
+        })
     )
   );
 }
@@ -33,7 +41,12 @@ async function getChildFolders(
     }/contents?page=${1}`
   )
     .then((resp) => resp.json())
-    .then((data) => data.Response as ElementResponse);
+    .then((data) => {
+      if (data.Response) {
+        return data.Response as ElementResponse;
+      }
+      return null;
+    });
 
   if (childFolders && childFolders.total >= 1001) {
     const nextPage = await fetchNextPages(
@@ -44,7 +57,7 @@ async function getChildFolders(
     childFolders.elements.push(...nextPage);
   }
 
-  return childFolders.elements;
+  return childFolders !== null ? childFolders.elements : null;
 }
 
 function getFolderDetails(
@@ -65,6 +78,47 @@ function getFolderDetails(
     }
     return acc;
   }, [] as FolderDetail[]);
+}
+const id: { ids: string; rootId: string }[] = [];
+const arr: RootFolder[] = [];
+
+async function rec(
+  folders: {
+    root: Element;
+    asset: AssetJSON;
+  }[],
+  baseUrl: string
+) {
+  // const arr: RootFolder[] = [];
+
+  for (const { asset, root } of folders) {
+    const children = await getChildFolders(asset, root, baseUrl);
+    console.log("root", root.folderId, "id", root.id);
+
+    if (children && children.length !== 0) {
+      const data = children.map((child) => ({
+        root: child,
+        asset,
+      }));
+
+      id.push(
+        ...children.map((child) => ({
+          ids: child.id,
+          rootId: root.id,
+        }))
+      );
+
+      // console.log(id);
+
+      await Promise.all(data.map((val) => rec([val], baseUrl)));
+    }
+
+    arr.push({
+      root,
+      children,
+      asset,
+    });
+  }
 }
 
 export const index: APIGatewayProxyHandler = async (
@@ -90,8 +144,8 @@ export const index: APIGatewayProxyHandler = async (
           .then((data) => data.Response as ElementResponse);
 
         if (element && element.total >= 1001) {
-          const nexPages = await fetchNextPages(element, `${baseUrl}${url}`);
-          element.elements.push(...nexPages);
+          const nextPages = await fetchNextPages(element, `${baseUrl}${url}`);
+          element.elements.push(...nextPages);
         }
 
         return { element, asset };
@@ -106,21 +160,26 @@ export const index: APIGatewayProxyHandler = async (
       return root;
     }, [] as { root: Element; asset: AssetJSON }[]);
 
-    const folders = await Promise.all(
-      rootFolders.map(async ({ asset, root }) => {
-        const children = await getChildFolders(asset, root, baseUrl);
+    // const folders = await Promise.all(
+    //   rootFolders.map(async ({ asset, root }) => {
+    //     const children = await getChildFolders(asset, root, baseUrl);
+    //
+    //     return {
+    //       root,
+    //       children,
+    //       asset,
+    //     };
+    //   })
+    // );
+    const x = rootFolders.find((root) => root.asset.apiName === "program");
 
-        return {
-          root,
-          children,
-          asset,
-        };
-      })
-    );
+    await rec([x], baseUrl);
 
-    const folderDetailsArr = folders.flatMap((folder) => {
+    console.log("folders");
+
+    const folderDetailsArr = arr.flatMap((folder) => {
       const children = getFolderDetails(
-        folder.children,
+        folder.children ? folder.children : [],
         folder.asset,
         folder.root,
         body.UrlObject.Endpoint_Url
@@ -137,25 +196,27 @@ export const index: APIGatewayProxyHandler = async (
       return [root, ...children];
     });
 
-    await fetch(
-      `http://apps.portqii.com:8070/saveFolder?siteId=${body.Site_Id}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          folderDetailsArr,
-        }),
-      }
-    );
+    console.log("folders2");
+
+    // await fetch(
+    //   `http://apps.portqii.com:8070/saveFolder?siteId=${body.Site_Id}`,
+    //   {
+    //     method: "POST",
+    //     headers: { "Content-Type": "application/json" },
+    //     body: JSON.stringify({
+    //       folderDetailsArr,
+    //     }),
+    //   }
+    // );
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ status: "Success" }),
+      body: JSON.stringify({ folderDetailsArr }),
     };
   } catch (e) {
     return {
       statusCode: 422,
-      body: JSON.stringify({ status: "Error" }),
+      body: JSON.stringify({ status: e }),
     };
   }
 };
@@ -211,4 +272,10 @@ interface FolderDetail {
   parentFolderId: string;
   assetType: string;
   absolutePath: string;
+}
+
+interface RootFolder {
+  root: Element;
+  children: Element[];
+  asset: AssetJSON;
 }
