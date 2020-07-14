@@ -12,14 +12,12 @@ function fetchNextPages(elements: ElementResponse, url: string) {
       fetch(`${url}${pageIndex}`)
         .then((resp) => resp.json())
         .then((data) => {
-          // if (data.Response.elements === undefined) {
-          //   console.log("under");
-          // }
-          if (data.Response.elements !== undefined) {
+          if (data.Response && data.Response.elements.length !== 0) {
             return data.Response.elements as Element;
           }
           return null;
         })
+        .catch(() => null)
     )
   );
 }
@@ -42,11 +40,12 @@ async function getChildFolders(
   )
     .then((resp) => resp.json())
     .then((data) => {
-      if (data.Response) {
+      if (data.Response && data.Response.elements.length !== 0) {
         return data.Response as ElementResponse;
       }
       return null;
-    });
+    })
+    .catch(() => null);
 
   if (childFolders && childFolders.total >= 1001) {
     const nextPage = await fetchNextPages(
@@ -57,7 +56,9 @@ async function getChildFolders(
     childFolders.elements.push(...nextPage);
   }
 
-  return childFolders !== null ? childFolders.elements : null;
+  return childFolders !== null
+    ? childFolders.elements.filter((element) => element.type === "Folder")
+    : null;
 }
 
 function getFolderDetails(
@@ -79,45 +80,40 @@ function getFolderDetails(
     return acc;
   }, [] as FolderDetail[]);
 }
-const id: { ids: string; rootId: string }[] = [];
-const arr: RootFolder[] = [];
 
-async function rec(
-  folders: {
+const recursiveAll = (array: Array<Promise<void>>) => {
+  return Promise.all(array).then((result) => {
+    if (result.length === array.length) return result;
+
+    return recursiveAll(array);
+  });
+};
+
+const promisesOfFolder: any[] = [];
+
+async function fetchFolders(
+  rootFolder: {
     root: Element;
     asset: AssetJSON;
   }[],
   baseUrl: string
 ) {
-  // const arr: RootFolder[] = [];
+  for (const { asset, root } of rootFolder) {
+    promisesOfFolder.push(
+      getChildFolders(asset, root, baseUrl).then((children) => {
+        if (children && children.length !== 0) {
+          children.forEach((child) => {
+            fetchFolders([{ root: child, asset }], baseUrl);
+          });
+        }
 
-  for (const { asset, root } of folders) {
-    const children = await getChildFolders(asset, root, baseUrl);
-    console.log("root", root.folderId, "id", root.id);
-
-    if (children && children.length !== 0) {
-      const data = children.map((child) => ({
-        root: child,
-        asset,
-      }));
-
-      id.push(
-        ...children.map((child) => ({
-          ids: child.id,
-          rootId: root.id,
-        }))
-      );
-
-      // console.log(id);
-
-      await Promise.all(data.map((val) => rec([val], baseUrl)));
-    }
-
-    arr.push({
-      root,
-      children,
-      asset,
-    });
+        return {
+          root,
+          children,
+          asset,
+        };
+      })
+    );
   }
 }
 
@@ -160,24 +156,11 @@ export const index: APIGatewayProxyHandler = async (
       return root;
     }, [] as { root: Element; asset: AssetJSON }[]);
 
-    // const folders = await Promise.all(
-    //   rootFolders.map(async ({ asset, root }) => {
-    //     const children = await getChildFolders(asset, root, baseUrl);
-    //
-    //     return {
-    //       root,
-    //       children,
-    //       asset,
-    //     };
-    //   })
-    // );
-    const x = rootFolders.find((root) => root.asset.apiName === "program");
+    fetchFolders(rootFolders, baseUrl);
 
-    await rec([x], baseUrl);
+    const folders = (await recursiveAll(promisesOfFolder)) as Folder[];
 
-    console.log("folders");
-
-    const folderDetailsArr = arr.flatMap((folder) => {
+    const folderDetailsArr = folders.flatMap((folder) => {
       const children = getFolderDetails(
         folder.children ? folder.children : [],
         folder.asset,
@@ -185,33 +168,35 @@ export const index: APIGatewayProxyHandler = async (
         body.UrlObject.Endpoint_Url
       );
 
-      const root = {
-        folderId: folder.root.id,
-        folderName: folder.root.name,
-        parentFolderId: null,
-        absolutePath: `${body.UrlObject.Endpoint_Url}/${folder.asset.apiName}/folder/${folder.root.id}`,
-        assetType: folder.asset.assetType,
-      };
-
-      return [root, ...children];
+      return [...children];
     });
 
-    console.log("folders2");
+    const rootFolderDetailsArr = rootFolders.map<FolderDetail>(
+      ({ root, asset }) => ({
+        folderId: root.id,
+        folderName: root.name,
+        parentFolderId: null,
+        absolutePath: `${body.UrlObject.Endpoint_Url}/${asset.apiName}/folder/${root.id}`,
+        assetType: asset.assetType,
+      })
+    );
 
-    // await fetch(
-    //   `http://apps.portqii.com:8070/saveFolder?siteId=${body.Site_Id}`,
-    //   {
-    //     method: "POST",
-    //     headers: { "Content-Type": "application/json" },
-    //     body: JSON.stringify({
-    //       folderDetailsArr,
-    //     }),
-    //   }
-    // );
+    await fetch(
+      `http://apps.portqii.com:8070/saveFolder?siteId=${body.Site_Id}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          folderDetailsArr: [...rootFolderDetailsArr, ...folderDetailsArr],
+        }),
+      }
+    );
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ folderDetailsArr }),
+      body: JSON.stringify({
+        status: "Success",
+      }),
     };
   } catch (e) {
     return {
@@ -269,12 +254,12 @@ interface Element {
 interface FolderDetail {
   folderId: string;
   folderName: string;
-  parentFolderId: string;
+  parentFolderId: string | null;
   assetType: string;
   absolutePath: string;
 }
 
-interface RootFolder {
+interface Folder {
   root: Element;
   children: Element[];
   asset: AssetJSON;
