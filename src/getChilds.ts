@@ -27,7 +27,7 @@ function getHtmlByAssetType(assetType: string, assetJSON: AssetJSON) {
   }
 }
 
-function findNode(object: Record<string, any>, key: string) {
+function findNode(object: string | Node, key: string) {
   let value: string;
   Object.keys(object).some((k: string) => {
     if (k === key) {
@@ -43,8 +43,8 @@ function findNode(object: Record<string, any>, key: string) {
   return value;
 }
 
-function getAssetsIdByJSONPath(
-  json: AssetJSON | Array<any>,
+function getAssetsIdByJSONPath<T>(
+  json: AssetJSON | Array<T>,
   expression: string,
   nodeValue: string
 ) {
