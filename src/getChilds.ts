@@ -73,7 +73,7 @@ export const index: APIGatewayProxyHandler = async (
     `http://apps.portqii.com:8070/getChilAssetConfigurationsByAssetType?AssetType=${body.assetType}`
   );
   const childAssetsConfiguration: childAssetsConfiguration[] = await response.json();
-  // console.log(childAssetsConfiguration);
+  // console.log(body.assetType, childAssetsConfiguration);
 
   for (const item of childAssetsConfiguration) {
     item.JSON_Node_Value = item.JSON_Node_Value.trim();
@@ -187,6 +187,17 @@ export const index: APIGatewayProxyHandler = async (
         jsonPath: "",
       });
     });
+
+    if (body.assetJSON.subject.search("<eloqua type=") !== -1) {
+      const subject = parse(body.assetJSON.subject);
+      const item = subject.querySelector("eloqua");
+      finalResult.push({
+        childAssetType: "Field Merge",
+        childAssetName: item.innerHTML,
+        nodeValue: "email_subject",
+        jsonPath: "",
+      });
+    }
   }
 
   return {
@@ -225,6 +236,7 @@ interface AssetJSON {
   };
   body: string;
   plainText: string;
+  subject: string;
 }
 
 interface childAssetsConfiguration {
