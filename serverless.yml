@@ -35,13 +35,14 @@ provider:
     NODE_ENV: ${self:provider.stage}
 
 functions:
-  handler:
-    handler: src/handler.index
+  getChilds:
+    handler: src/getChilds.index
     events:
       - http:
           path: getChilds
           method: post
   folderStructure:
+    timeout: 150
     handler: src/folderStructure.index
     events:
       - http:
