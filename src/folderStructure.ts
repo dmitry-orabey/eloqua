@@ -36,7 +36,7 @@ async function getChildFolders(
   rootFolder: Element,
   baseUrl: string
 ) {
-  const childFolders = await fetch(
+  const childFolders = (await fetch(
     `${baseUrl}/${assetJSONS.apiName}/folder/${
       rootFolder.id
     }/contents?page=${1}`
@@ -50,7 +50,7 @@ async function getChildFolders(
     })
     .catch(() => {
       return null;
-    });
+    })) as ElementResponse | null;
 
   if (childFolders && childFolders.total >= 1001) {
     const nextPage = await fetchNextPages(
@@ -86,15 +86,15 @@ function getFolderDetails(
   }, [] as FolderDetail[]);
 }
 
-const recursiveAll = (array: Array<Promise<void>>) => {
+function recursiveAll<T>(array: Array<Promise<T>>) {
   return Promise.all(array).then((result) => {
     if (result.length === array.length) return result;
 
     return recursiveAll(array);
   });
-};
+}
 
-const promisesOfFolder: any[] = [];
+const promisesOfFolder: Promise<Folder>[] = [];
 
 async function fetchFolders(
   rootFolder: {
