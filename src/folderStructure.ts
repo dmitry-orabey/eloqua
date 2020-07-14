@@ -1,4 +1,5 @@
 import { APIGatewayProxyEvent, APIGatewayProxyHandler } from "aws-lambda";
+import fetch from "node-fetch";
 
 function fetchNextPages(elements: ElementResponse, url: string) {
   const pages = [];
