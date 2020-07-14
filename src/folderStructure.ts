@@ -17,7 +17,9 @@ function fetchNextPages(elements: ElementResponse, url: string) {
           }
           return null;
         })
-        .catch(() => null)
+        .catch(() => {
+          return null;
+        })
     )
   );
 }
@@ -45,7 +47,9 @@ async function getChildFolders(
       }
       return null;
     })
-    .catch(() => null);
+    .catch(() => {
+      return null;
+    });
 
   if (childFolders && childFolders.total >= 1001) {
     const nextPage = await fetchNextPages(
