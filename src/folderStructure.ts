@@ -1,6 +1,23 @@
 import { APIGatewayProxyEvent, APIGatewayProxyHandler } from "aws-lambda";
 import fetch from "node-fetch";
 
+function getPath(
+  folders: Array<Omit<FolderDetail, "absolutePath">>,
+  parentFolderId: string,
+  path: string
+): string {
+  const folder = folders.find(({ folderId }) => folderId === parentFolderId);
+
+  if (folder) {
+    return `${getPath(
+      folders,
+      folder.parentFolderId,
+      folder.folderName
+    )}/${path}`;
+  }
+  return path;
+}
+
 function fetchNextPages(elements: ElementResponse, url: string) {
   const pages = [];
 
@@ -62,28 +79,29 @@ async function getChildFolders(
   }
 
   return childFolders !== null
-    ? childFolders.elements.filter((element) => element.type === "Folder")
+    ? childFolders.elements.filter((element) => element?.type === "Folder")
     : null;
 }
 
 function getFolderDetails(
   folders: Element[],
   assetJSONS: AssetJSON,
-  rootFolder: Element,
-  endpointUrl: string
+  rootFolder: Element
 ) {
-  return folders.reduce((acc, element) => {
-    if (element.type === "Folder") {
-      acc.push({
-        folderId: element.id,
-        folderName: element.name,
-        parentFolderId: rootFolder.id,
-        absolutePath: `${endpointUrl}/${assetJSONS.apiName}/folder/${element.id}`,
-        assetType: assetJSONS.assetType,
-      });
-    }
-    return acc;
-  }, [] as FolderDetail[]);
+  return folders.reduce<Array<Omit<FolderDetail, "absolutePath">>>(
+    (acc, element) => {
+      if (element?.type === "Folder") {
+        acc.push({
+          folderId: element.id,
+          folderName: element.name,
+          parentFolderId: rootFolder.id,
+          assetType: assetJSONS.assetType,
+        });
+      }
+      return acc;
+    },
+    []
+  );
 }
 
 function recursiveAll<T>(array: Array<Promise<T>>) {
@@ -165,23 +183,31 @@ export const index: APIGatewayProxyHandler = async (
 
     const folders = (await recursiveAll(promisesOfFolder)) as Folder[];
 
-    const folderDetailsArr = folders.flatMap((folder) => {
-      const children = getFolderDetails(
-        folder.children ? folder.children : [],
-        folder.asset,
-        folder.root,
-        body.UrlObject.Endpoint_Url
-      );
+    const folderDetailsArr: FolderDetail[] = folders
+      .flatMap((folder) => {
+        const children = getFolderDetails(
+          folder.children ? folder.children : [],
+          folder.asset,
+          folder.root
+        );
 
-      return [...children];
-    });
+        return [...children];
+      })
+      .map((folder, _, array) => ({
+        ...folder,
+        absolutePath: `root/${getPath(
+          array,
+          folder.parentFolderId,
+          folder.folderName
+        )}`,
+      }));
 
     const rootFolderDetailsArr = rootFolders.map<FolderDetail>(
       ({ root, asset }) => ({
         folderId: root.id,
         folderName: root.name,
         parentFolderId: null,
-        absolutePath: `${body.UrlObject.Endpoint_Url}/${asset.apiName}/folder/${root.id}`,
+        absolutePath: `root`,
         assetType: asset.assetType,
       })
     );
