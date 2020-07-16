@@ -112,21 +112,20 @@ function recursiveAll<T>(array: Array<Promise<T>>) {
   });
 }
 
-const promisesOfFolder: Promise<Folder>[] = [];
-
-async function fetchFolders(
+function fetchFolders(
   rootFolder: {
     root: Element;
     asset: AssetJSON;
   }[],
-  baseUrl: string
+  baseUrl: string,
+  promisesOfFolder: Promise<Folder>[]
 ) {
   for (const { asset, root } of rootFolder) {
     promisesOfFolder.push(
       getChildFolders(asset, root, baseUrl).then((children) => {
         if (children && children.length !== 0) {
           children.forEach((child) => {
-            fetchFolders([{ root: child, asset }], baseUrl);
+            fetchFolders([{ root: child, asset }], baseUrl, promisesOfFolder);
           });
         }
 
@@ -138,6 +137,8 @@ async function fetchFolders(
       })
     );
   }
+
+  return promisesOfFolder;
 }
 
 export const index: APIGatewayProxyHandler = async (
@@ -179,9 +180,9 @@ export const index: APIGatewayProxyHandler = async (
       return root;
     }, [] as { root: Element; asset: AssetJSON }[]);
 
-    fetchFolders(rootFolders, baseUrl);
-
-    const folders = (await recursiveAll(promisesOfFolder)) as Folder[];
+    const folders = (await recursiveAll(
+      fetchFolders(rootFolders, baseUrl, [])
+    )) as Folder[];
 
     const folderDetailsArr: FolderDetail[] = folders
       .flatMap((folder) => {
