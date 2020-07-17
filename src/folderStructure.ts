@@ -35,7 +35,8 @@ function fetchNextPages(elements: ElementResponse, url: string) {
           }
           return null;
         })
-        .catch(() => {
+        .catch((e) => {
+          console.log(e);
           return null;
         })
     )
@@ -65,7 +66,13 @@ async function getChildFolders(
       }
       return null;
     })
-    .catch(() => {
+    .catch((e) => {
+      console.log(
+        `${baseUrl}/${assetJSONS.apiName}/folder/${
+          rootFolder.id
+        }/contents?page=${1}`
+      );
+      console.log(e);
       return null;
     })) as ElementResponse | null;
 
