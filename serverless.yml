@@ -48,3 +48,17 @@ functions:
       - http:
           path: getFolderStructure
           method: post
+  searchAssets:
+    timeout: 200
+    handler: src/searchAssets.index
+    events:
+      - http:
+          path: searchAssets
+          method: post
+  replaceId:
+    timeout: 200
+    handler: src/replaceId.index
+    events:
+      - http:
+          path: replaceId
+          method: post
