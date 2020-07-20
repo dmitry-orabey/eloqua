@@ -1,5 +1,15 @@
 import { APIGatewayProxyEvent, APIGatewayProxyHandler } from "aws-lambda";
-import fetch from "node-fetch";
+
+import axios from "axios";
+import axiosRetry from "axios-retry";
+
+axiosRetry(axios, {
+  retries: 3,
+  retryDelay: (retryCount) => {
+    console.log(retryCount);
+    return retryCount * 1000;
+  },
+});
 
 function getPath(
   folders: Array<Omit<FolderDetail, "absolutePath">>,
@@ -27,16 +37,15 @@ function fetchNextPages(elements: ElementResponse, url: string) {
 
   return Promise.all(
     pages.map((pageIndex) =>
-      fetch(`${url}${pageIndex}`)
-        .then((resp) => resp.json())
-        .then((data) => {
+      axios
+        .get(`${url}${pageIndex}`)
+        .then(({ data }) => {
           if (data.Response && data.Response.elements.length !== 0) {
             return data.Response.elements as Element;
           }
           return null;
         })
-        .catch((e) => {
-          console.log(e);
+        .catch(() => {
           return null;
         })
     )
@@ -54,25 +63,23 @@ async function getChildFolders(
   rootFolder: Element,
   baseUrl: string
 ) {
-  const childFolders = (await fetch(
-    `${baseUrl}/${assetJSONS.apiName}/folder/${
-      rootFolder.id
-    }/contents?page=${1}`
-  )
-    .then((resp) => resp.json())
-    .then((data) => {
+  const childFolders = (await axios
+    .get(
+      `${baseUrl}/${assetJSONS.apiName}/folder/${
+        rootFolder.id
+      }/contents?page=${1}`
+    )
+    .then(({ data }) => {
       if (data.Response && data.Response.elements.length !== 0) {
         return data.Response as ElementResponse;
       }
+      if (data.Response === undefined) {
+        console.log("null");
+      }
       return null;
     })
-    .catch((e) => {
-      console.log(
-        `${baseUrl}/${assetJSONS.apiName}/folder/${
-          rootFolder.id
-        }/contents?page=${1}`
-      );
-      console.log(e);
+    .catch(() => {
+      console.log("error");
       return null;
     })) as ElementResponse | null;
 
@@ -166,9 +173,11 @@ export const index: APIGatewayProxyHandler = async (
       asset: AssetJSON;
     }>(
       urls.map(async ({ asset, url }) => {
-        const element = await fetch(`${baseUrl}${url}${page}`)
-          .then((response) => response.json())
-          .then((data) => data.Response as ElementResponse);
+        const element = await axios
+          .get(`${baseUrl}${url}${page}`)
+          // .then((response) => response.json())
+          .then(({ data }) => data.Response as ElementResponse)
+          .catch(() => null);
 
         if (element && element.total >= 1001) {
           const nextPages = await fetchNextPages(element, `${baseUrl}${url}`);
@@ -220,21 +229,21 @@ export const index: APIGatewayProxyHandler = async (
       })
     );
 
-    await fetch(
-      `http://apps.portqii.com:8070/saveFolder?siteId=${body.Site_Id}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          folderDetailsArr: [...rootFolderDetailsArr, ...folderDetailsArr],
-        }),
-      }
-    );
+    // await fetch(
+    //   `http://apps.portqii.com:8070/saveFolder?siteId=${body.Site_Id}`,
+    //   {
+    //     method: "POST",
+    //     headers: { "Content-Type": "application/json" },
+    //     body: JSON.stringify({
+    //       folderDetailsArr: [...rootFolderDetailsArr, ...folderDetailsArr],
+    //     }),
+    //   }
+    // );
 
     return {
       statusCode: 200,
       body: JSON.stringify({
-        status: "Success",
+        folderDetailsArr: [...rootFolderDetailsArr, ...folderDetailsArr].length,
       }),
     };
   } catch (e) {
