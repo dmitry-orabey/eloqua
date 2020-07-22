@@ -1,10 +1,8 @@
-import { APIGatewayProxyHandler, APIGatewayProxyEvent } from "aws-lambda";
+import { APIGatewayProxyHandler } from "aws-lambda";
 
-export const index: APIGatewayProxyHandler = async (
-  event: APIGatewayProxyEvent
-) => {
-  const promises: Promise<void>[] = [];
-  const body: Body = JSON.parse(event.body);
+export const index: APIGatewayProxyHandler = async () => {
+  // const promises: Promise<void>[] = [];
+  // const body: Body = JSON.parse(event.body);
   const finalResult = [];
 
   return {
