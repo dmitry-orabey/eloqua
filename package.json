@@ -27,6 +27,7 @@
     "execa": "^4.0.2",
     "jsdom": "^16.2.2",
     "jsonpath-plus": "^4.0.0",
+    "lodash.update": "^4.10.2",
     "node-fetch": "^2.6.0",
     "node-html-parser": "^1.2.20",
     "pdf-image": "^2.0.0",
