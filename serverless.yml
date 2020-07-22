@@ -42,8 +42,9 @@ functions:
           path: getChilds
           method: post
   folderStructure:
-    timeout: 200
     handler: src/folderStructure.index
+    environment:
+      SLS_DEBUG: true
     events:
       - http:
           path: getFolderStructure

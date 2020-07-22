@@ -1,12 +1,10 @@
 import { APIGatewayProxyEvent, APIGatewayProxyHandler } from "aws-lambda";
-
 import axios from "axios";
 import axiosRetry from "axios-retry";
 
 axiosRetry(axios, {
   retries: 3,
   retryDelay: (retryCount) => {
-    console.log(retryCount);
     return retryCount * 1000;
   },
 });
@@ -37,19 +35,22 @@ function fetchNextPages(elements: ElementResponse, url: string) {
 
   return Promise.all(
     pages.map((pageIndex) =>
-      axios
-        .get(`${url}${pageIndex}`)
-        .then(({ data }) => {
-          if (data.Response && data.Response.elements.length !== 0) {
-            return data.Response.elements as Element;
-          }
-          return null;
-        })
-        .catch(() => {
-          return null;
-        })
+      axios.get(`${url}${pageIndex}`).then(({ data }) => {
+        if (data.Response && data.Response.elements.length !== 0) {
+          return data.Response.elements as Element;
+        }
+        return null;
+      })
     )
-  );
+  ).catch((e) => {
+    throw {
+      status: e.response.status,
+      message: e.message,
+      url: e.response.config.url,
+    };
+
+    return null;
+  });
 }
 
 function getRootFolder(elementResponse: ElementResponse) {
@@ -63,25 +64,30 @@ async function getChildFolders(
   rootFolder: Element,
   baseUrl: string
 ) {
-  const childFolders = (await axios
-    .get(
+  const childFolders = await axios
+    .get<{ Response: ElementResponse } | null>(
       `${baseUrl}/${assetJSONS.apiName}/folder/${
         rootFolder.id
       }/contents?page=${1}`
     )
     .then(({ data }) => {
       if (data.Response && data.Response.elements.length !== 0) {
-        return data.Response as ElementResponse;
-      }
-      if (data.Response === undefined) {
-        console.log("null");
+        return data.Response;
       }
       return null;
     })
-    .catch(() => {
+    .catch((e) => {
+      const error = {
+        status: e.response.status,
+        message: e.message,
+        url: e.response.config.url,
+      };
       console.log("error");
+
+      throw e;
+
       return null;
-    })) as ElementResponse | null;
+    });
 
   if (childFolders && childFolders.total >= 1001) {
     const nextPage = await fetchNextPages(
@@ -136,19 +142,25 @@ function fetchFolders(
 ) {
   for (const { asset, root } of rootFolder) {
     promisesOfFolder.push(
-      getChildFolders(asset, root, baseUrl).then((children) => {
-        if (children && children.length !== 0) {
-          children.forEach((child) => {
-            fetchFolders([{ root: child, asset }], baseUrl, promisesOfFolder);
-          });
-        }
+      getChildFolders(asset, root, baseUrl)
+        .then((children) => {
+          if (children && children.length !== 0) {
+            children.forEach((child) => {
+              fetchFolders([{ root: child, asset }], baseUrl, promisesOfFolder);
+            });
+          }
 
-        return {
-          root,
-          children,
-          asset,
-        };
-      })
+          return {
+            root,
+            children,
+            asset,
+          };
+        })
+        .catch((e) => {
+          console.log("error2");
+          throw e;
+          return null;
+        })
     );
   }
 
@@ -175,9 +187,16 @@ export const index: APIGatewayProxyHandler = async (
       urls.map(async ({ asset, url }) => {
         const element = await axios
           .get(`${baseUrl}${url}${page}`)
-          // .then((response) => response.json())
           .then(({ data }) => data.Response as ElementResponse)
-          .catch(() => null);
+          .catch((e) => {
+            throw {
+              status: e.response.status,
+              message: e.message,
+              url: e.response.config.url,
+            };
+
+            return null;
+          });
 
         if (element && element.total >= 1001) {
           const nextPages = await fetchNextPages(element, `${baseUrl}${url}`);
@@ -198,7 +217,9 @@ export const index: APIGatewayProxyHandler = async (
 
     const folders = (await recursiveAll(
       fetchFolders(rootFolders, baseUrl, [])
-    )) as Folder[];
+    ).catch((e) => {
+      throw e;
+    })) as Folder[];
 
     const folderDetailsArr: FolderDetail[] = folders
       .flatMap((folder) => {
@@ -243,13 +264,14 @@ export const index: APIGatewayProxyHandler = async (
     return {
       statusCode: 200,
       body: JSON.stringify({
+        status: "Success",
         folderDetailsArr: [...rootFolderDetailsArr, ...folderDetailsArr].length,
       }),
     };
   } catch (e) {
     return {
       statusCode: 422,
-      body: JSON.stringify({ status: e }),
+      body: JSON.stringify(e),
     };
   }
 };
