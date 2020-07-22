@@ -20,6 +20,7 @@
     "camelcase": "off",
     "no-restricted-syntax": "off",
     "import/prefer-default-export": "off",
+    "no-throw-literal": "off",
     "max-len": [
       "error",
       {
