@@ -43,8 +43,6 @@ functions:
           method: post
   folderStructure:
     handler: src/folderStructure.index
-    environment:
-      SLS_DEBUG: true
     events:
       - http:
           path: getFolderStructure

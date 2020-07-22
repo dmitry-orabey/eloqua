@@ -4,9 +4,7 @@ import axiosRetry from "axios-retry";
 
 axiosRetry(axios, {
   retries: 3,
-  retryDelay: (retryCount) => {
-    return retryCount * 1000;
-  },
+  retryDelay: (retryCount) => retryCount * 1000,
 });
 
 function getPath(
@@ -48,8 +46,6 @@ function fetchNextPages(elements: ElementResponse, url: string) {
       message: e.message,
       url: e.response.config.url,
     };
-
-    return null;
   });
 }
 
@@ -77,16 +73,11 @@ async function getChildFolders(
       return null;
     })
     .catch((e) => {
-      const error = {
+      throw {
         status: e.response.status,
         message: e.message,
         url: e.response.config.url,
       };
-      console.log("error");
-
-      throw e;
-
-      return null;
     });
 
   if (childFolders && childFolders.total >= 1001) {
@@ -157,9 +148,7 @@ function fetchFolders(
           };
         })
         .catch((e) => {
-          console.log("error2");
           throw e;
-          return null;
         })
     );
   }
@@ -194,8 +183,6 @@ export const index: APIGatewayProxyHandler = async (
               message: e.message,
               url: e.response.config.url,
             };
-
-            return null;
           });
 
         if (element && element.total >= 1001) {
@@ -250,27 +237,33 @@ export const index: APIGatewayProxyHandler = async (
       })
     );
 
-    // await fetch(
-    //   `http://apps.portqii.com:8070/saveFolder?siteId=${body.Site_Id}`,
-    //   {
-    //     method: "POST",
-    //     headers: { "Content-Type": "application/json" },
-    //     body: JSON.stringify({
-    //       folderDetailsArr: [...rootFolderDetailsArr, ...folderDetailsArr],
-    //     }),
-    //   }
-    // );
+    await axios
+      .post(
+        `http://apps.portqii.com:8070/saveFolder?siteId=${body.Site_Id}`,
+        {
+          folderDetailsArr: [...rootFolderDetailsArr, ...folderDetailsArr],
+        },
+        {
+          headers: { "Content-Type": "application/json" },
+        }
+      )
+      .catch((e) => {
+        throw {
+          status: e.response.status,
+          message: e.message,
+          url: e.response.config.url,
+        };
+      });
 
     return {
       statusCode: 200,
       body: JSON.stringify({
         status: "Success",
-        folderDetailsArr: [...rootFolderDetailsArr, ...folderDetailsArr].length,
       }),
     };
   } catch (e) {
     return {
-      statusCode: 422,
+      statusCode: e.status || 422,
       body: JSON.stringify(e),
     };
   }
