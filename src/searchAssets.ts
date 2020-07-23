@@ -69,7 +69,7 @@ async function refreshTokens(
   targetSiteId: number,
   url: string,
   page: number
-) {
+): Promise<ElementResponse> {
   await axios
     .get(
       `http://apps.portqii.com:8070/updateToken?AccessToken=${access.Access_Token}&RefreshToken=${access.Refresh_Token}&siteId=${targetSiteId}`
@@ -98,7 +98,14 @@ export const index: APIGatewayProxyHandler = async (
       .then(({ data }) => ({
         sourceAbsolutePath: data.Absolute_Path,
         sourceFolderName: data.Folder_Name,
-      }));
+      }))
+      .catch((e) => {
+        throw {
+          status: e.response.status,
+          message: e.message,
+          url: e.response.config.url,
+        };
+      });
 
     const folder = await axios
       .get<Source>(
@@ -118,20 +125,25 @@ export const index: APIGatewayProxyHandler = async (
         .get<Access>(
           `http://apps.portqii.com:8070/getTokens?siteId=${body.SiteDetails.targetSiteId}`
         )
-        .then(({ data }) => data);
+        .then(({ data }) => data)
+        .catch((e) => {
+          throw {
+            status: e.response.status,
+            message: e.message,
+            url: e.response.config.url,
+          };
+        });
 
       const host = `${access.Base_Url}/API/REST/2.0/assets/${body.AssetDetails.assetApiName}/folder/${target.targetFolderId}/contents?page=`;
       const url = `https://m88a5j5z7k.executeapi.us-east-1.amazonaws.com/dev/request?access_token=${access.Access_Token}&refresh_token=${access.Refresh_Token}&client_id=${body.Authentication.ClientId}&client_secret=${body.Authentication.ClientSecret}&url=${host}`;
 
-      let elementResponse = await axios
+      let elementResponse: ElementResponse = await axios
         .get<Response>(`${url}${page + 1}`)
-        .then(({ data }) => {
-          return data.Response;
-        })
+        .then(({ data }) => data.Response)
         .catch(() => null);
 
-      if (elementResponse) {
-        elementResponse = refreshTokens(
+      if (!elementResponse) {
+        elementResponse = await refreshTokens(
           access,
           body.SiteDetails.targetSiteId,
           url,
@@ -190,10 +202,8 @@ export const index: APIGatewayProxyHandler = async (
     };
   } catch (e) {
     return {
-      statusCode: 422,
-      body: JSON.stringify({
-        Status: "Failed",
-      }),
+      statusCode: e.status || 422,
+      body: JSON.stringify(e),
     };
   }
 };
