@@ -135,12 +135,12 @@ export const index: APIGatewayProxyHandler = async (
         });
 
       const host = `${access.Base_Url}/API/REST/2.0/assets/${body.AssetDetails.assetApiName}/folder/${target.targetFolderId}/contents?page=`;
-      const url = `https://m88a5j5z7k.executeapi.us-east-1.amazonaws.com/dev/request?access_token=${access.Access_Token}&refresh_token=${access.Refresh_Token}&client_id=${body.Authentication.ClientId}&client_secret=${body.Authentication.ClientSecret}&url=${host}`;
+      const url = `https://m88a5j5z7k.execute-api.us-east-1.amazonaws.com/dev/request?access_token=${access.Access_Token}&refresh_token=${access.Refresh_Token}&client_id=${body.Authentication.ClientId}&client_secret=${body.Authentication.ClientSecret}&url=${host}`;
 
-      let elementResponse: ElementResponse = await axios
+      let elementResponse = await axios
         .get<Response>(`${url}${page + 1}`)
         .then(({ data }) => data.Response)
-        .catch(() => null);
+        .catch<null>(() => null);
 
       if (!elementResponse) {
         elementResponse = await refreshTokens(
