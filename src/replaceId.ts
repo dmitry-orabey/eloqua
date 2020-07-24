@@ -107,7 +107,6 @@ interface Body {
 
 interface AssetJSON {
   type: string;
-
   [key: string]: string | number;
 }
 
