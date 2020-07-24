@@ -36,60 +36,69 @@ function getPath(JSONPathExpression: string[]) {
 export const index: APIGatewayProxyHandler = async (
   event: APIGatewayProxyEvent
 ) => {
-  const body: Body = JSON.parse(event.body);
+  try {
+    const body: Body = JSON.parse(event.body);
 
-  const assetJSON: AssetJSON = await fetch(
-    `http://apps.portqii.com:8070/getAssetJSONByExecutionId?executionId=${body.Execution_Id}`
-  )
-    .then((resp) => resp.json())
-    .then((resp) => JSON.parse(resp[0].Asset_JSON));
+    const assetJSON: AssetJSON = await fetch(
+      `http://apps.portqii.com:8070/getAssetJSONByExecutionId?executionId=${body.Execution_Id}`
+    )
+      .then((resp) => resp.json())
+      .then((resp) => JSON.parse(resp[0].Asset_JSON));
 
-  const detailsAssetJSON: DetailAssetJSONResponse[] = await fetch(
-    `http://apps.portqii.com:8070/getChildDetailsByParentExecutionId?executionId=${body.Execution_Id}`
-  ).then((resp) => resp.json());
+    const detailsAssetJSON: DetailAssetJSONResponse[] = await fetch(
+      `http://apps.portqii.com:8070/getChildDetailsByParentExecutionId?executionId=${body.Execution_Id}`
+    ).then((resp) => resp.json());
 
-  const assets = detailsAssetJSON.map<DetailAssetJSON>((detail) => ({
-    assetType: detail.Asset_Type,
-    SourceAssetId: detail.Asset_Id,
-    targetAssetId: detail.Target_Asset_Id,
-    JSONPath: detail.JSON_Path,
-    nodeValue: detail.Node_Value,
-    nodeType: detail.Node_Type,
-  }));
+    const assets = detailsAssetJSON.map<DetailAssetJSON>((detail) => ({
+      assetType: detail.Asset_Type,
+      SourceAssetId: detail.Asset_Id,
+      targetAssetId: detail.Target_Asset_Id,
+      JSONPath: detail.JSON_Path,
+      nodeValue: detail.Node_Value,
+      nodeType: detail.Node_Type,
+    }));
 
-  const replaceJSON = assets.reduce((acc, asset) => {
-    if (asset.JSONPath) {
-      const result = JSONPath({ path: asset.JSONPath, json: assetJSON });
-      const path = getPath(
-        JSONPath({
-          path: asset.JSONPath,
-          json: assetJSON,
-          resultType: "path",
-        })
-      );
-      const newJSON = { ...(acc ? assetJSON : acc) };
+    const replaceJSON = assets.reduce((acc, asset) => {
+      if (asset.JSONPath) {
+        const result = JSONPath({ path: asset.JSONPath, json: assetJSON });
+        const path = getPath(
+          JSONPath({
+            path: asset.JSONPath,
+            json: assetJSON,
+            resultType: "path",
+          })
+        );
+        const newJSON = { ...(acc ? { ...assetJSON, ...acc } : acc) };
 
-      update(newJSON, path, () => replaceAssetJSON(result, asset));
+        update(newJSON, path, () => replaceAssetJSON(result, asset));
 
-      return newJSON;
-    }
+        return newJSON;
+      }
 
-    const result = JSONPath({ path: asset.nodeValue, json: assetJSON });
+      const result = JSONPath({ path: asset.nodeValue, json: assetJSON });
 
-    if (`${result[0]}` === `${asset.SourceAssetId}`) {
-      return {
-        ...assetJSON,
-        [asset.nodeValue]: asset.targetAssetId,
-      };
-    }
+      if (`${result[0]}` === `${asset.SourceAssetId}`) {
+        return {
+          ...assetJSON,
+          [asset.nodeValue]: asset.targetAssetId,
+        };
+      }
 
-    return acc;
-  }, {});
+      return acc;
+    }, {});
 
-  return {
-    statusCode: 200,
-    body: JSON.stringify(replaceJSON),
-  };
+    return {
+      statusCode: 200,
+      body: JSON.stringify(replaceJSON),
+    };
+  } catch (e) {
+    return {
+      statusCode: 422,
+      body: JSON.stringify({
+        status: "Failed",
+      }),
+    };
+  }
 };
 
 interface Body {
@@ -98,6 +107,7 @@ interface Body {
 
 interface AssetJSON {
   type: string;
+
   [key: string]: string | number;
 }
 
