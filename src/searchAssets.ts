@@ -137,7 +137,11 @@ export const index: APIGatewayProxyHandler = async (
         });
 
       const host = `${access.Base_Url}/API/REST/2.0/assets/${body.AssetDetails.assetApiName}/folder/${target.targetFolderId}/contents?page=`;
-      const url = `https://m88a5j5z7k.execute-api.us-east-1.amazonaws.com/dev/request?access_token=${access.Access_Token}&refresh_token=${access.Refresh_Token}&client_id=${body.Authentication.ClientId}&client_secret=${body.Authentication.ClientSecret}&url=${host}`;
+      const url = `https://m88a5j5z7k.execute-api.us-east-1.amazonaws.com/dev/request?access_token=${encodeURIComponent(
+        access.Access_Token
+      )}&refresh_token=${encodeURIComponent(access.Refresh_Token)}&client_id=${
+        body.Authentication.ClientId
+      }&client_secret=${body.Authentication.ClientSecret}&url=${host}`;
 
       let elementResponse = await axios
         .get<Response>(`${url}${page + 1}`)
@@ -162,7 +166,7 @@ export const index: APIGatewayProxyHandler = async (
       if (elementResponse) {
         const filter_arr = elementResponse.elements.filter(
           (element) =>
-            element.type === body.AssetDetails.assetType &&
+            element.type === body.AssetDetails.assetSearchName &&
             element.name === body.AssetDetails.assetName
         );
 
@@ -220,6 +224,7 @@ interface Body {
     assetId: number;
     assetName: string;
     assetApiName: string;
+    assetSearchName: string;
   };
   FolderDetails: {
     folderId: number;
