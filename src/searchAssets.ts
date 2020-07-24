@@ -42,7 +42,7 @@ function getAssetDetailsJSON(filter_arr: Element[], assetType: string) {
 function fetchNextPages(elements: ElementResponse, url: string) {
   const pages = [];
 
-  for (let i = 2; i < Math.floor(elements.total / 1000) + 1; i++) {
+  for (let i = 2; i < Math.ceil(elements.total / 1000) + 1; i++) {
     pages.push(i);
   }
 
@@ -55,13 +55,15 @@ function fetchNextPages(elements: ElementResponse, url: string) {
         return null;
       })
     )
-  ).catch((e) => {
-    throw {
-      status: e.response.status,
-      message: e.message,
-      url: e.response.config.url,
-    };
-  });
+  )
+    .then((data) => data.flat())
+    .catch((e) => {
+      throw {
+        status: e.response.status,
+        message: e.message,
+        url: e.response.config.url,
+      };
+    });
 }
 
 async function refreshTokens(
