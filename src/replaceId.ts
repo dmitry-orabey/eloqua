@@ -58,34 +58,36 @@ export const index: APIGatewayProxyHandler = async (
       nodeType: detail.Node_Type,
     }));
 
-    const replaceJSON = assets.reduce((acc, asset) => {
-      if (asset.JSONPath) {
-        const result = JSONPath({ path: asset.JSONPath, json: assetJSON });
-        const path = getPath(
-          JSONPath({
-            path: asset.JSONPath,
-            json: assetJSON,
-            resultType: "path",
-          })
-        );
-        const newJSON = { ...(acc ? { ...assetJSON, ...acc } : acc) };
+    const replaceJSON = assets.reduce(
+      (acc, asset) => {
+        if (asset.JSONPath) {
+          const result = JSONPath({ path: asset.JSONPath, json: acc });
+          const path = getPath(
+            JSONPath({
+              path: asset.JSONPath,
+              json: acc,
+              resultType: "path",
+            })
+          );
 
-        update(newJSON, path, () => replaceAssetJSON(result, asset));
+          update(acc, path, () => replaceAssetJSON(result, asset));
 
-        return newJSON;
-      }
+          return acc;
+        }
 
-      const result = JSONPath({ path: asset.nodeValue, json: assetJSON });
+        const result = JSONPath({ path: asset.nodeValue, json: acc });
 
-      if (`${result[0]}` === `${asset.SourceAssetId}`) {
-        return {
-          ...assetJSON,
-          [asset.nodeValue]: asset.targetAssetId,
-        };
-      }
+        if (`${result[0]}` === `${asset.SourceAssetId}`) {
+          return {
+            ...acc,
+            [asset.nodeValue]: asset.targetAssetId,
+          };
+        }
 
-      return acc;
-    }, {});
+        return acc;
+      },
+      { ...assetJSON }
+    );
 
     return {
       statusCode: 200,
