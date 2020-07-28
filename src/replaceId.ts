@@ -1,5 +1,4 @@
 import { APIGatewayProxyHandler, APIGatewayProxyEvent } from "aws-lambda";
-import fetch from "node-fetch";
 import { JSONPath } from "jsonpath-plus";
 import update from "lodash.update";
 
@@ -11,11 +10,11 @@ function replaceAssetJSON(
     (acc, element) => {
       if (
         element.type === asset.nodeType &&
-        `${element[asset.nodeValue]}` === `${asset.SourceAssetId}`
+        `${element[asset.nodeValue]}` === `${asset.childAssetId}`
       ) {
         acc.push({
           ...element,
-          [asset.nodeValue]: asset.targetAssetId,
+          [asset.nodeValue]: asset.targetChildAssetId,
         });
       } else {
         acc.push({
@@ -39,32 +38,16 @@ export const index: APIGatewayProxyHandler = async (
   try {
     const body: Body = JSON.parse(event.body);
 
-    const assetJSON: AssetJSON = await fetch(
-      `http://apps.portqii.com:8070/getAssetJSONByExecutionId?executionId=${body.Execution_Id}`
-    )
-      .then((resp) => resp.json())
-      .then((resp) => JSON.parse(resp[0].Asset_JSON));
-
-    const detailsAssetJSON: DetailAssetJSONResponse[] = await fetch(
-      `http://apps.portqii.com:8070/getChildDetailsByParentExecutionId?executionId=${body.Execution_Id}`
-    ).then((resp) => resp.json());
-
-    const assets = detailsAssetJSON.map<DetailAssetJSON>((detail) => ({
-      assetType: detail.Asset_Type,
-      SourceAssetId: detail.Asset_Id,
-      targetAssetId: detail.Target_Asset_Id,
-      JSONPath: detail.JSON_Path,
-      nodeValue: detail.Node_Value,
-      nodeType: detail.Node_Type,
-    }));
+    const assetJSON = body.parentAssetJSON;
+    const assets = body.childAssetDetailsArr;
 
     const replaceJSON = assets.reduce(
       (acc, asset) => {
-        if (asset.JSONPath) {
-          const result = JSONPath({ path: asset.JSONPath, json: acc });
+        if (asset.jsonPath) {
+          const result = JSONPath({ path: asset.jsonPath, json: acc });
           const path = getPath(
             JSONPath({
-              path: asset.JSONPath,
+              path: asset.jsonPath,
               json: acc,
               resultType: "path",
             })
@@ -77,10 +60,10 @@ export const index: APIGatewayProxyHandler = async (
 
         const result = JSONPath({ path: asset.nodeValue, json: acc });
 
-        if (`${result[0]}` === `${asset.SourceAssetId}`) {
+        if (`${result[0]}` === `${asset.childAssetId}`) {
           return {
             ...acc,
-            [asset.nodeValue]: asset.targetAssetId,
+            [asset.nodeValue]: asset.targetChildAssetId,
           };
         }
 
@@ -104,7 +87,8 @@ export const index: APIGatewayProxyHandler = async (
 };
 
 interface Body {
-  Execution_Id: string;
+  parentAssetJSON: AssetJSON;
+  childAssetDetailsArr: DetailAssetJSON[];
 }
 
 interface AssetJSON {
@@ -113,28 +97,10 @@ interface AssetJSON {
 }
 
 interface DetailAssetJSON {
-  assetType: string;
-  SourceAssetId: number;
-  targetAssetId: number;
-  JSONPath: string;
+  childAssetType: string;
+  childAssetId: number;
+  targetChildAssetId: number;
+  jsonPath: string;
   nodeValue: string;
   nodeType: string;
-}
-
-interface DetailAssetJSONResponse {
-  Sync_Execution_Id: number;
-  Sync_History_Id: number;
-  Asset_Type: string;
-  Asset_Id: number;
-  Asset_Name: string;
-  Parent_Execution_Id: number;
-  Asset_JSON: null | string;
-  JSON_Path: string;
-  Node_Value: string;
-  Node_Type: string;
-  Missing_Target_Flag: null | string;
-  Duplicate_Flag: null | string;
-  Target_Asset_Id: number;
-  Target_Asset_Name: null | string;
-  Target_Asset_JSON: null | string;
 }
