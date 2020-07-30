@@ -59,3 +59,9 @@ functions:
       - http:
           path: replaceId
           method: post
+  elementMapping:
+    handler: src/elementMapping.index
+    events:
+      - http:
+          path: elementMapping
+          method: post
