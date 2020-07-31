@@ -4,32 +4,34 @@ import update from "lodash.update";
 
 function replaceAssetJSON(
   elements: { [key: string]: string | number }[],
-  asset: DetailAssetJSON
+  asset: DetailAssetJSON,
+  indexes: Array<string>
 ) {
-  return elements.reduce<{ [key: string]: string | number }[]>(
-    (acc, element) => {
-      if (
-        element.type === asset.nodeType &&
-        `${element[asset.nodeValue]}` === `${asset.childAssetId}`
-      ) {
-        acc.push({
-          ...element,
-          [asset.nodeValue]: asset.targetChildAssetId,
-        });
-      } else {
-        acc.push({
-          ...element,
-        });
-      }
+  return elements.map((element, index) => {
+    if (
+      element.type === asset.nodeType &&
+      `${element[asset.nodeValue]}` === `${asset.childAssetId}` &&
+      indexes.includes(`${index}`)
+    ) {
+      return {
+        ...element,
+        [asset.nodeValue]: asset.targetChildAssetId,
+      };
+    }
 
-      return acc;
-    },
-    []
-  );
+    return {
+      ...element,
+    };
+  });
 }
 
 function getPath(JSONPathExpression: string[]) {
-  return JSONPathExpression[0].split("$")[1].split(/\[[\d]+\]$/)[0];
+  return {
+    path: JSONPathExpression[0].split("$")[1].split(/\[[\d]+\]$/)[0],
+    indexes: JSONPathExpression.map((el) => {
+      return /[\d]+/.exec(/\[[\d]+\]$/.exec(el.split("$")[1])[0])[0];
+    }),
+  };
 }
 
 export const index: APIGatewayProxyHandler = async (
@@ -44,8 +46,7 @@ export const index: APIGatewayProxyHandler = async (
     const replaceJSON = assets.reduce(
       (acc, asset) => {
         if (asset.jsonPath) {
-          const result = JSONPath({ path: asset.jsonPath, json: acc });
-          const path = getPath(
+          const { path, indexes } = getPath(
             JSONPath({
               path: asset.jsonPath,
               json: acc,
@@ -53,7 +54,13 @@ export const index: APIGatewayProxyHandler = async (
             })
           );
 
-          update(acc, path, () => replaceAssetJSON(result, asset));
+          const initialArr = JSONPath({ path: `$${path}`, json: acc });
+
+          const modifiedJSON = replaceAssetJSON(initialArr[0], asset, indexes);
+
+          update(acc, path, () => {
+            return modifiedJSON;
+          });
 
           return acc;
         }
