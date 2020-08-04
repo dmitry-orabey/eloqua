@@ -74,7 +74,11 @@ async function refreshTokens(
 ): Promise<ElementResponse> {
   await axios
     .get(
-      `http://apps.portqii.com:8070/updateToken?AccessToken=${access.Access_Token}&RefreshToken=${access.Refresh_Token}&siteId=${targetSiteId}`
+      `http://apps.portqii.com:8070/updateToken?AccessToken=${encodeURIComponent(
+        access.Access_Token
+      )}&RefreshToken=${encodeURIComponent(
+        access.Refresh_Token
+      )}&siteId=${targetSiteId}`
     )
     .then(({ data }) => data);
 
