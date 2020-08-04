@@ -4,14 +4,12 @@ import update from "lodash.update";
 
 function replaceAssetJSON(
   elements: { [key: string]: string | number }[],
-  asset: DetailAssetJSON,
-  indexes: Array<string>
+  asset: DetailAssetJSON
 ) {
-  return elements.map((element, index) => {
+  return elements.map((element) => {
     if (
       element.type === asset.nodeType &&
-      `${element[asset.nodeValue]}` === `${asset.childAssetId}` &&
-      indexes.includes(`${index}`)
+      `${element[asset.nodeValue]}` === `${asset.childAssetId}`
     ) {
       return {
         ...element,
@@ -23,15 +21,6 @@ function replaceAssetJSON(
       ...element,
     };
   });
-}
-
-function getPath(JSONPathExpression: string[]) {
-  return {
-    path: JSONPathExpression[0].split("$")[1].split(/\[[\d]+\]$/)[0],
-    indexes: JSONPathExpression.map((el) => {
-      return /[\d]+/.exec(/\[[\d]+\]$/.exec(el.split("$")[1])[0])[0];
-    }),
-  };
 }
 
 export const index: APIGatewayProxyHandler = async (
@@ -46,20 +35,29 @@ export const index: APIGatewayProxyHandler = async (
     const replaceJSON = assets.reduce(
       (acc, asset) => {
         if (asset.jsonPath) {
-          const { path, indexes } = getPath(
-            JSONPath({
-              path: asset.jsonPath,
-              json: acc,
-              resultType: "path",
-            })
-          );
+          const paths: string[] = JSONPath({
+            path: asset.jsonPath,
+            json: acc,
+            resultType: "path",
+          });
 
-          const initialArr = JSONPath({ path: `$${path}`, json: acc });
+          paths.forEach((path) => {
+            update(acc, path.split("$")[1], () => {
+              const initialJSON = JSONPath({
+                path,
+                json: acc,
+                resultType: "value",
+              });
 
-          const modifiedJSON = replaceAssetJSON(initialArr[0], asset, indexes);
+              const modifiedJSON = replaceAssetJSON(initialJSON, asset);
 
-          update(acc, path, () => {
-            return modifiedJSON;
+              return modifiedJSON.reduce(
+                (_, element) => ({
+                  ...element,
+                }),
+                {}
+              );
+            });
           });
 
           return acc;
@@ -100,6 +98,7 @@ interface Body {
 
 interface AssetJSON {
   type: string;
+
   [key: string]: string | number;
 }
 
