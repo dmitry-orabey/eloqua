@@ -32,7 +32,8 @@
         "ignoreTemplateLiterals": true
       }
     ],
-    "prettier/prettier": ["error"]
+    "prettier/prettier": ["error"],
+    "no-useless-escape": "off"
   },
   "parser": "@typescript-eslint/parser",
   "env": {},

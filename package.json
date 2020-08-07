@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@types/axios": "^0.14.0",
+    "@types/parse5": "^5.0.3",
     "async": "^3.2.0",
     "await-exec": "^0.1.2",
     "aws-lambda": "^1.0.6",
@@ -30,6 +31,8 @@
     "execa": "^4.0.2",
     "jsdom": "^16.2.2",
     "jsonpath-plus": "^4.0.0",
+    "lodash.find": "^4.6.0",
+    "lodash.findkey": "^4.6.0",
     "lodash.update": "^4.10.2",
     "node-fetch": "^2.6.0",
     "node-html-parser": "^1.2.20",
