@@ -65,3 +65,9 @@ functions:
       - http:
           path: elementMapping
           method: post
+  replaceLink:
+    handler: src/replaceLink.index
+    events:
+      - http:
+          path: replaceLink
+          method: post
