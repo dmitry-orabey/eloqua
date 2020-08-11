@@ -19,8 +19,9 @@ function step32b(
   TargetLink: string
 ) {
   let json = JSON.stringify(parentAssetJSON);
-  let sourceReplaceText = `"\"id\":\""${SourceLink}"\""`;
-  let targetReplaceText = `"\"id\":\""${TargetLink}"\""`;
+  let sourceReplaceText = `\\"id\\":\\"${SourceLink}\\"`;
+  let targetReplaceText = `\\"id\\":\\"${TargetLink}\\"`;
+
   json = json.split(sourceReplaceText).join(targetReplaceText);
 
   sourceReplaceText = `form${SourceLink}`;
@@ -91,7 +92,9 @@ function step33c(
     resultType: "value",
   });
 
-  const obj = find(response, { type: `${element.ChildType}Cell` });
+  const obj = find(response, {
+    type: `${element.ChildType.replace(/\s/g, "")}Cell`,
+  });
 
   if (obj && obj.content.object.id === SourceLink) {
     return documentDescription.replace(new RegExp(SourceLink, "g"), TargetLink);
