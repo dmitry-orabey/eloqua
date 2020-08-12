@@ -1,6 +1,22 @@
 import { APIGatewayProxyEvent, APIGatewayProxyHandler } from "aws-lambda";
 import axios from "axios";
 
+function getUrl(
+  Base_Url: string,
+  Access_Token: string,
+  Refresh_Token: string,
+  body: Body,
+  targetFolderId: number
+) {
+  const host = `${Base_Url}/API/REST/2.0/assets/${body.AssetDetails.assetApiName}/folder/${targetFolderId}/contents?page=`;
+
+  return `https://m88a5j5z7k.execute-api.us-east-1.amazonaws.com/dev/request?access_token=${encodeURIComponent(
+    Access_Token
+  )}&refresh_token=${encodeURIComponent(Refresh_Token)}&client_id=${
+    body.Authentication.ClientId
+  }&client_secret=${body.Authentication.ClientSecret}&url=${host}`;
+}
+
 function getAssetDetailsJSON(filter_arr: Element[], assetType: string) {
   if (filter_arr.length === 1) {
     return {
@@ -67,24 +83,32 @@ function fetchNextPages(elements: ElementResponse, url: string) {
 }
 
 async function refreshTokens(
-  access: Access,
   targetSiteId: number,
   url: string,
-  page: number
-): Promise<ElementResponse> {
+  page: number,
+  Access_Token: string,
+  Refresh_Token: string
+) {
   await axios
     .get(
       `http://apps.portqii.com:8070/updateToken?AccessToken=${encodeURIComponent(
-        access.Access_Token
+        Access_Token
       )}&RefreshToken=${encodeURIComponent(
-        access.Refresh_Token
+        Refresh_Token
       )}&siteId=${targetSiteId}`
     )
-    .then(({ data }) => data);
+    .then(({ data }) => data)
+    .catch(() => null);
 
   return axios
     .get<Response>(`${url}${page + 1}`)
-    .then(({ data }) => data.Response)
+    .then(({ data }) => {
+      return {
+        ...data.Response,
+        AccessToken: data.AccessToken,
+        RefreshToken: data.RefreshToken,
+      };
+    })
     .catch(() => null);
 }
 
@@ -140,24 +164,38 @@ export const index: APIGatewayProxyHandler = async (
           };
         });
 
-      const host = `${access.Base_Url}/API/REST/2.0/assets/${body.AssetDetails.assetApiName}/folder/${target.targetFolderId}/contents?page=`;
-      const url = `https://m88a5j5z7k.execute-api.us-east-1.amazonaws.com/dev/request?access_token=${encodeURIComponent(
-        access.Access_Token
-      )}&refresh_token=${encodeURIComponent(access.Refresh_Token)}&client_id=${
-        body.Authentication.ClientId
-      }&client_secret=${body.Authentication.ClientSecret}&url=${host}`;
+      const url = getUrl(
+        access.Base_Url,
+        access.Access_Token,
+        access.Refresh_Token,
+        body,
+        target.targetFolderId
+      );
 
       let elementResponse = await axios
         .get<Response>(`${url}${page + 1}`)
-        .then(({ data }) => data.Response)
+        .then(({ data }) => {
+          return {
+            ...data.Response,
+            AccessToken: data.AccessToken,
+            RefreshToken: data.RefreshToken,
+          };
+        })
         .catch<null>(() => null);
 
-      if (!elementResponse) {
+      if (elementResponse?.AccessToken && elementResponse?.RefreshToken) {
         elementResponse = await refreshTokens(
-          access,
           body.SiteDetails.targetSiteId,
-          url,
-          page
+          getUrl(
+            access.Base_Url,
+            elementResponse.AccessToken,
+            elementResponse.RefreshToken,
+            body,
+            target.targetFolderId
+          ),
+          page,
+          elementResponse.AccessToken,
+          elementResponse.RefreshToken
         );
       }
 
@@ -258,6 +296,8 @@ interface Response {
   ResponseCode: number;
   ErrorDescription: string;
   Response: ElementResponse;
+  AccessToken?: string;
+  RefreshToken?: string;
 }
 
 interface ElementResponse {
@@ -265,6 +305,8 @@ interface ElementResponse {
   page: number;
   pageSize: number;
   total: number;
+  AccessToken?: string;
+  RefreshToken?: string;
 }
 
 interface Element {
