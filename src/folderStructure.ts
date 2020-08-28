@@ -53,7 +53,15 @@ function fetchNextPages(elements: ElementResponse, url: string) {
 
 function getRootFolder(elementResponse: ElementResponse) {
   return elementResponse.elements.find(
-    (el) => el.isSystem === "true" && el.type === "Folder" && !el.folderId
+    (el) =>
+      (el.description === "Root" ||
+        el.description === "Root for Data Canvas" ||
+        el.description === "Root for Event Registrations" ||
+        el.description === "Root for Surveys" ||
+        el.description === "Root for Custom Data Objects" ||
+        el.description === "Contact Filters" ||
+        el.description === "Contact Groups") &&
+      el.isSystem === "true"
   );
 }
 
