@@ -72,6 +72,13 @@ export const index: APIGatewayProxyHandler = async (
           };
         }
 
+        if (assetJSON.type === "Campaign") {
+          return {
+            ...acc,
+            connectedId: asset.targetChildAssetId,
+          };
+        }
+
         return acc;
       },
       { ...assetJSON }
@@ -98,7 +105,6 @@ interface Body {
 
 interface AssetJSON {
   type: string;
-
   [key: string]: string | number;
 }
 
