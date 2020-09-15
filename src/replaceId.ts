@@ -59,23 +59,26 @@ export const index: APIGatewayProxyHandler = async (
               );
             });
           });
-
-          return acc;
         }
 
         const result = JSONPath({ path: asset.nodeValue, json: acc });
 
         if (`${result[0]}` === `${asset.childAssetId}`) {
-          return {
-            ...acc,
-            [asset.nodeValue]: asset.targetChildAssetId,
-          };
+          update(acc, asset.nodeValue, () => asset.targetChildAssetId);
         }
 
         if (assetJSON.type === "Campaign") {
+          const reg = `"connectedId":"${asset.childAssetId}"`;
+          const replacedString = `"connectedId":"${asset.targetChildAssetId}"`;
+
+          const replacedJSON = JSON.stringify(acc).replace(
+            new RegExp(reg, "g"),
+            replacedString
+          );
+          const replacedAcc = JSON.parse(replacedJSON);
+
           return {
-            ...acc,
-            connectedId: asset.targetChildAssetId,
+            ...replacedAcc,
           };
         }
 
