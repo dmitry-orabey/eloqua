@@ -20,7 +20,8 @@ function getUrl(
 function getAssetDetailsJSON(
   filter_arr: Element[],
   assetType: string,
-  folderId: number
+  folderId: number,
+  assetId: string | number
 ) {
   if (filter_arr.length === 1) {
     return {
@@ -50,7 +51,7 @@ function getAssetDetailsJSON(
     return {
       assetType,
       assetName: filter_arr[0].name,
-      assetId: filter_arr[0].id,
+      assetId,
       missingAssetInTarget: 0,
       duplicateFlag: 1,
       missingFolderInTarget: 0,
@@ -316,7 +317,8 @@ export const index: APIGatewayProxyHandler = async (
           const assetDetailsJSON = getAssetDetailsJSON(
             filter_arr,
             body.AssetDetails.assetType,
-            target.targetFolderId
+            target.targetFolderId,
+            body.AssetDetails.assetId
           );
 
           if (assetDetailsJSON) {
