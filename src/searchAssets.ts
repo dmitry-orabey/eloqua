@@ -20,8 +20,7 @@ function getUrl(
 function getAssetDetailsJSON(
   filter_arr: Element[],
   assetType: string,
-  folderId: number,
-  assetId: string | number
+  folderId: number
 ) {
   if (filter_arr.length === 1) {
     return {
@@ -51,7 +50,7 @@ function getAssetDetailsJSON(
     return {
       assetType,
       assetName: filter_arr[0].name,
-      assetId,
+      assetId: filter_arr[0].id,
       missingAssetInTarget: 0,
       duplicateFlag: 1,
       missingFolderInTarget: 0,
@@ -219,15 +218,19 @@ export const index: APIGatewayProxyHandler = async (
 
         assetDetailsArr.push(assetDetailsJSON);
       } else if (elementResponse.elements.length > 0) {
+        const data = elementResponse.elements.filter(
+          (element) => element.name === body.AssetDetails.assetName
+        );
+
         const assetDetailsJSON = {
           assetType: body.AssetDetails.assetType,
-          assetName: elementResponse.elements[0].name,
-          assetId: elementResponse.elements[0].id,
+          assetName: data[0].name,
+          assetId: data[0].id,
           missingAssetInTarget: 0,
           duplicateFlag: 1,
           missingFolderInTarget: 0,
           assetUpdatedAt: "",
-          targetFolderId: elementResponse.elements[0].folderId,
+          targetFolderId: data[0].folderId,
           folderId: body.FolderDetails.folderId,
         };
 
@@ -317,8 +320,7 @@ export const index: APIGatewayProxyHandler = async (
           const assetDetailsJSON = getAssetDetailsJSON(
             filter_arr,
             body.AssetDetails.assetType,
-            target.targetFolderId,
-            body.AssetDetails.assetId
+            target.targetFolderId
           );
 
           if (assetDetailsJSON) {
